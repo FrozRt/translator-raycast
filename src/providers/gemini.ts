@@ -23,9 +23,15 @@ export async function translateWithGemini(
   opts: TranslateOptions,
 ): Promise<TranslateResult> {
   const body = {
-    systemInstruction: { parts: [{ text: buildSystemPrompt(opts) }] },
+    systemInstruction: { parts: [{ text: buildSystemPrompt() }] },
     contents: [{ role: "user", parts: [{ text: buildUserPrompt(input) }] }],
-    generationConfig: { responseMimeType: "application/json" },
+    generationConfig: {
+      responseMimeType: "application/json",
+      // Translation is a direct task — no reasoning needed. thinkingBudget: 0
+      // disables Gemini 2.5 Flash's "thinking" phase, roughly halving latency.
+      // (Ignored by models that don't support thinking, so it's safe.)
+      thinkingConfig: { thinkingBudget: 0 },
+    },
   };
 
   const json = (await postJson({

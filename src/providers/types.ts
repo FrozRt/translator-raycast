@@ -9,10 +9,6 @@
 export interface TranslateOptions {
   apiKey: string;
   model: string;
-  /** Language of the explanation block (e.g. "Russian"). */
-  explanationLanguage: string;
-  /** Force the block even for simple phrases (the alwaysExplain preference). */
-  alwaysExplain: boolean;
   /** Optional external cancellation (the provider adds its own on timeout). */
   signal?: AbortSignal;
 }

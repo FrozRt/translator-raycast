@@ -2,11 +2,9 @@ import {
   Action,
   ActionPanel,
   Detail,
-  Form,
   Icon,
   getPreferenceValues,
   openExtensionPreferences,
-  useNavigation,
 } from "@raycast/api";
 import { showFailureToast } from "@raycast/utils";
 import { useEffect, useState } from "react";
@@ -17,6 +15,7 @@ import {
   type TranslateErrorKind,
   asTranslateError,
 } from "./lib/errors";
+import { readInputText } from "./lib/input";
 
 const API_KEY_URL = "https://aistudio.google.com/app/apikey";
 
@@ -26,8 +25,6 @@ function resolveOptions(): TranslateOptions {
   return {
     apiKey: (prefs.apiKey ?? "").trim(),
     model: (prefs.model ?? "").trim() || DEFAULT_MODEL,
-    explanationLanguage: (prefs.explanationLanguage ?? "").trim() || "Russian",
-    alwaysExplain: Boolean(prefs.alwaysExplain),
   };
 }
 
@@ -46,6 +43,7 @@ type ViewState =
   | { status: "ok"; result: TranslateResult }
   | { status: "error"; error: TranslateError };
 
+/** Translation on top; for single words, the details block below a divider. */
 function composeResult(result: TranslateResult): string {
   return result.explanation
     ? `${result.translation}\n\n---\n\n${result.explanation}`
@@ -55,7 +53,7 @@ function composeResult(result: TranslateResult): string {
 function errorTitle(error: TranslateError): string {
   switch (error.kind) {
     case "empty":
-      return "Empty input";
+      return "Nothing to translate";
     case "auth":
       return "Gemini API key required";
     case "rateLimit":
@@ -72,7 +70,8 @@ function errorTitle(error: TranslateError): string {
 }
 
 const ERROR_HINTS: Record<TranslateErrorKind, string> = {
-  empty: "Enter some text and try again.",
+  empty:
+    "Select some text (or copy it to the clipboard), then run the command again.",
   auth: `A Gemini API key is required — it's **free**: get one at [aistudio.google.com](${API_KEY_URL}) (Get API key) and paste it into the extension preferences.`,
   rateLimit: "Too many requests. Wait a few seconds and try again.",
   timeout:
@@ -91,17 +90,31 @@ function errorMarkdown(error: TranslateError): string {
   return lines.join("\n");
 }
 
-/** Result screen: the request runs in useEffect; states are loading/ok/error. */
-function ResultView({ input }: { input: string }) {
+/**
+ * The command: read the selected text (or clipboard), translate, and show the
+ * result in a Detail window. Direction is auto-detected (Cyrillic → English,
+ * Latin → Russian); a single word also gets a details block. Copy the result,
+ * or press Esc to dismiss.
+ */
+export default function Command() {
   const [state, setState] = useState<ViewState>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
-    setState({ status: "loading" });
 
     (async () => {
       try {
+        const input = await readInputText();
+        if (cancelled) {
+          return;
+        }
+        if (input === "") {
+          throw new TranslateError(
+            "empty",
+            "No selected text and nothing on the clipboard to translate.",
+          );
+        }
         const result = await translate(input, {
           ...resolveOptions(),
           signal: controller.signal,
@@ -123,16 +136,11 @@ function ResultView({ input }: { input: string }) {
       cancelled = true;
       controller.abort();
     };
-  }, [input]);
+  }, []);
 
   if (state.status === "loading") {
-    const quoted = defangImages(input).replace(/\n/g, "\n> ");
     return (
-      <Detail
-        isLoading
-        navigationTitle="Polyglot"
-        markdown={`> ${quoted}\n\n_Translating…_`}
-      />
+      <Detail isLoading navigationTitle="Translate" markdown="_Translating…_" />
     );
   }
 
@@ -140,7 +148,7 @@ function ResultView({ input }: { input: string }) {
     const { error } = state;
     return (
       <Detail
-        navigationTitle="Polyglot — error"
+        navigationTitle="Translate — error"
         markdown={errorMarkdown(error)}
         actions={
           <ActionPanel>
@@ -170,15 +178,20 @@ function ResultView({ input }: { input: string }) {
   const composed = composeResult(result);
   return (
     <Detail
-      navigationTitle="Polyglot"
+      navigationTitle="Translate"
       markdown={defangImages(composed)}
       actions={
         <ActionPanel>
-          <Action.CopyToClipboard title="Copy Result" content={composed} />
           <Action.CopyToClipboard
-            title="Copy Translation Only"
+            title="Copy Translation"
             content={result.translation}
           />
+          {result.explanation && (
+            <Action.CopyToClipboard
+              title="Copy Translation and Details"
+              content={composed}
+            />
+          )}
           <Action
             title="Open Extension Preferences"
             icon={Icon.Gear}
@@ -187,45 +200,5 @@ function ResultView({ input }: { input: string }) {
         </ActionPanel>
       }
     />
-  );
-}
-
-/** Command: the input form -> pushes the result screen. */
-export default function Command() {
-  const { push } = useNavigation();
-  const [error, setError] = useState<string | undefined>();
-
-  return (
-    <Form
-      actions={
-        <ActionPanel>
-          <Action.SubmitForm
-            title="Translate"
-            icon={Icon.Globe}
-            onSubmit={(values: { text: string }) => {
-              const text = (values.text ?? "").trim();
-              if (text === "") {
-                setError("Enter some text");
-                return;
-              }
-              push(<ResultView input={text} />);
-            }}
-          />
-        </ActionPanel>
-      }
-    >
-      <Form.TextArea
-        id="text"
-        title="Text"
-        placeholder="Type text in Russian or English — the direction is detected automatically…"
-        autoFocus
-        error={error}
-        onChange={() => {
-          if (error) {
-            setError(undefined);
-          }
-        }}
-      />
-    </Form>
   );
 }

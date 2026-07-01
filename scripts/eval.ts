@@ -1,18 +1,17 @@
 /**
- * Headless run of the §8 test cases, bypassing the Raycast UI (Gemini only).
+ * Headless run of the translator test cases, bypassing the Raycast UI (Gemini only).
  *
  * Validates the prompt LOGIC (the main risk) directly through the core
- * `translate()`, without the Raycast modal and without preferences. The key
+ * `translate()`, without the Raycast window and without preferences. The key
  * comes from the GEMINI_API_KEY env var.
  *
  * Usage:
  *   GEMINI_API_KEY=...  npm run eval                 # all cases
  *   GEMINI_API_KEY=...  npm run eval -- --case 1     # one case
- *   GEMINI_API_KEY=...  npm run eval -- --lang English
  *   npm run eval -- --list                           # list the cases
- *   npm run eval -- --case 8                          # "no key" — works without a key
+ *   npm run eval -- --case 6                          # "no key" — works without a key
  *
- * Flags: --case <N>  --lang <Language>  --model <id>  --always  --list  --help
+ * Flags: --case <N>  --model <id>  --list  --help
  */
 
 import { DEFAULT_MODEL, translate } from "../src/providers";
@@ -34,15 +33,13 @@ const cyan = (s: string) => paint("36", s);
 // --- argument parsing --------------------------------------------------------
 interface Args {
   caseNo?: number;
-  lang?: string;
   model?: string;
-  always: boolean;
   list: boolean;
   help: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { always: false, list: false, help: false };
+  const args: Args = { list: false, help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const valueOf = (inline?: string) => inline ?? argv[++i];
@@ -51,14 +48,8 @@ function parseArgs(argv: string[]): Args {
       case "--case":
         args.caseNo = Number(valueOf(inline));
         break;
-      case "--lang":
-        args.lang = valueOf(inline);
-        break;
       case "--model":
         args.model = valueOf(inline);
-        break;
-      case "--always":
-        args.always = true;
         break;
       case "--list":
         args.list = true;
@@ -74,8 +65,8 @@ function parseArgs(argv: string[]): Args {
   return args;
 }
 
-// --- §8 cases ----------------------------------------------------------------
-type Special = "emptyKey" | "langFlip";
+// --- cases -------------------------------------------------------------------
+type Special = "emptyKey";
 interface EvalCase {
   n: number;
   title: string;
@@ -88,41 +79,48 @@ interface EvalCase {
 const CASES: EvalCase[] = [
   {
     n: 1,
-    title: "EN word «set» — polysemy",
+    title: "EN word «set» — single word gets details",
     input: "set",
-    expect: "RU translation + FULL block: several meanings, examples across different contexts.",
+    expect: "RU translation + a details block (in Russian) covering several meanings.",
+    check: (r) => ({
+      ok: r.explanation !== null,
+      note: r.explanation !== null ? "details block present" : "no block (a single word should get one)",
+    }),
   },
   {
     n: 2,
     title: "RU word «замок» — homonyms",
     input: "замок",
-    expect: "EN translation + block separating castle / lock, with examples.",
-  },
-  {
-    n: 3,
-    title: "EN idiom «break a leg»",
-    input: "break a leg",
-    expect: "Translation + block: literal vs idiomatic meaning.",
-  },
-  {
-    n: 4,
-    title: "Plain sentence, no pitfalls",
-    input: "I will call you tomorrow",
-    expect: "RU translation, block ABSENT (explanation === null).",
+    expect: "EN translation + details block separating castle / lock.",
     check: (r) => ({
-      ok: r.explanation === null,
-      note: r.explanation === null ? "block absent" : "block present but should not be",
+      ok: r.explanation !== null,
+      note: r.explanation !== null ? "details block present" : "no block (a single word should get one)",
     }),
   },
   {
-    n: 5,
-    title: "RU ambiguity «Он снял банк»",
-    input: "Он снял банк",
-    expect: "EN translation + block flags the ambiguity (won the pot / withdrew money / rented the bank).",
+    n: 3,
+    title: "EN sentence — translation only, no block",
+    input: "I will call you tomorrow",
+    expect: "RU translation, NO details block (explanation === null).",
+    check: (r) => ({
+      ok: r.explanation === null,
+      note: r.explanation === null ? "block absent (correct for a sentence)" : "block present but should not be",
+    }),
   },
   {
-    n: 6,
-    title: "Mixed text + terms",
+    n: 4,
+    title: "RU sentence — direction flips to EN",
+    input: "Я позвоню тебе завтра",
+    expect: "English translation; no details block.",
+    check: (r) => {
+      const looksEnglish = /[a-z]/i.test(r.translation) && !/[а-яё]/i.test(r.translation);
+      const noBlock = r.explanation === null;
+      return { ok: looksEnglish && noBlock, note: `english:${looksEnglish ? "✓" : "✗"} noBlock:${noBlock ? "✓" : "✗"}` };
+    },
+  },
+  {
+    n: 5,
+    title: "Mixed text + terms kept verbatim",
     input: "Запушь изменения в main и проверь CI",
     expect: "EN translation; push / main / CI kept verbatim, not mistranslated.",
     check: (r) => {
@@ -135,13 +133,7 @@ const CASES: EvalCase[] = [
     },
   },
   {
-    n: 7,
-    title: "Technical term «retopology»",
-    input: "retopology",
-    expect: "Translation/transliteration + explanation (3D term).",
-  },
-  {
-    n: 8,
+    n: 6,
     title: "Empty Gemini key",
     input: "test",
     expect: "Core throws TranslateError kind=auth (UI leads to preferences). Works without a key.",
@@ -149,18 +141,15 @@ const CASES: EvalCase[] = [
     check: () => ({ ok: true, note: "" }),
   },
   {
-    n: 9,
-    title: "Long paragraph, no pitfalls",
+    n: 7,
+    title: "Long RU paragraph — translation only",
     input:
-      "Вчера я весь день работал из дома. Утром ответил на письма, потом созвонился с командой и обсудил план на неделю. После обеда написал отчёт и отправил его руководителю, а вечером немного погулял и лёг спать пораньше.",
-    expect: "EN translation; block short or absent.",
-  },
-  {
-    n: 10,
-    title: "Block language switch (explanationLanguage)",
-    input: "set",
-    expect: "Same input as case 1, but the block comes out in a different language (flipped from current).",
-    special: "langFlip",
+      "Вчера я весь день работал из дома. Утром ответил на письма, потом созвонился с командой и обсудил план на неделю.",
+    expect: "EN translation; no details block.",
+    check: (r) => ({
+      ok: r.explanation === null,
+      note: r.explanation === null ? "block absent (correct for a paragraph)" : "block present but should not be",
+    }),
   },
 ];
 
@@ -168,7 +157,7 @@ const CASES: EvalCase[] = [
 function printResult(r: TranslateResult) {
   console.log(bold("Translation: ") + r.translation);
   if (r.explanation) {
-    console.log(bold("Block:"));
+    console.log(bold("Details:"));
     console.log(
       r.explanation
         .split("\n")
@@ -176,16 +165,12 @@ function printResult(r: TranslateResult) {
         .join("\n"),
     );
   } else {
-    console.log(bold("Block: ") + dim("[no block]"));
+    console.log(bold("Details: ") + dim("[no block]"));
   }
 }
 
 function verdict(ok: boolean, note: string) {
   console.log((ok ? green("AUTO-CHECK: PASS") : red("AUTO-CHECK: FAIL")) + (note ? dim(` — ${note}`) : ""));
-}
-
-function flipLang(lang: string): string {
-  return lang.trim().toLowerCase() === "russian" ? "English" : "Russian";
 }
 
 async function runCase(c: EvalCase, base: TranslateOptions, hasKey: boolean) {
@@ -212,15 +197,9 @@ async function runCase(c: EvalCase, base: TranslateOptions, hasKey: boolean) {
     return;
   }
 
-  const opts: TranslateOptions =
-    c.special === "langFlip" ? { ...base, explanationLanguage: flipLang(base.explanationLanguage) } : base;
-  if (c.special === "langFlip") {
-    console.log(dim(`(explanationLanguage: ${base.explanationLanguage} → ${opts.explanationLanguage})`));
-  }
-
   try {
     const started = Date.now();
-    const r = await translate(c.input, opts);
+    const r = await translate(c.input, base);
     const ms = Date.now() - started;
     printResult(r);
     console.log(dim(`(${ms} ms)`));
@@ -235,13 +214,11 @@ async function runCase(c: EvalCase, base: TranslateOptions, hasKey: boolean) {
 }
 
 function printHelp() {
-  console.log(`Polyglot eval — run the §8 test cases without the Raycast UI (Gemini only).
+  console.log(`Translator eval — run the test cases without the Raycast UI (Gemini only).
 
 Flags:
-  --case <N>            a single case (1..10)
-  --lang <Language>     block language (default: Russian)
+  --case <N>            a single case (1..7)
   --model <id>          override the Gemini model
-  --always              alwaysExplain = true
   --list                list the cases
   --help                this help
 
@@ -257,7 +234,7 @@ async function main() {
     return;
   }
   if (args.list) {
-    console.log(bold("§8 cases:"));
+    console.log(bold("Cases:"));
     for (const c of CASES) {
       console.log(`  ${String(c.n).padStart(2)}. ${c.title}`);
     }
@@ -269,17 +246,13 @@ async function main() {
   const base: TranslateOptions = {
     apiKey,
     model: args.model ?? DEFAULT_MODEL,
-    explanationLanguage: args.lang ?? process.env.POLYGLOT_EXPLANATION_LANGUAGE ?? "Russian",
-    alwaysExplain: args.always,
   };
 
-  console.log(bold("Polyglot eval — Gemini"));
-  console.log(dim("Model:        ") + base.model);
-  console.log(dim("Block lang:   ") + base.explanationLanguage);
-  console.log(dim("alwaysExplain:") + ` ${base.alwaysExplain}`);
-  console.log(dim("Key:          ") + (hasKey ? green("set") : red(`missing (${ENV_KEY})`)));
+  console.log(bold("Translator eval — Gemini"));
+  console.log(dim("Model: ") + base.model);
+  console.log(dim("Key:   ") + (hasKey ? green("set") : red(`missing (${ENV_KEY})`)));
   if (!hasKey) {
-    console.log(yellow("Without a key only case 8 (empty key) runs; the rest are SKIP."));
+    console.log(yellow("Without a key only case 6 (empty key) runs; the rest are SKIP."));
   }
 
   const selected = args.caseNo ? CASES.filter((c) => c.n === args.caseNo) : CASES;
