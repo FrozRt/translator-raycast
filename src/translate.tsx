@@ -140,7 +140,11 @@ export default function Command() {
 
   if (state.status === "loading") {
     return (
-      <Detail isLoading navigationTitle="Translate" markdown="_Translating…_" />
+      <Detail
+        isLoading
+        navigationTitle="Translator"
+        markdown="_Translating…_"
+      />
     );
   }
 
@@ -148,7 +152,7 @@ export default function Command() {
     const { error } = state;
     return (
       <Detail
-        navigationTitle="Translate — error"
+        navigationTitle="Translator — error"
         markdown={errorMarkdown(error)}
         actions={
           <ActionPanel>
@@ -178,7 +182,7 @@ export default function Command() {
   const composed = composeResult(result);
   return (
     <Detail
-      navigationTitle="Translate"
+      navigationTitle="Translator"
       markdown={defangImages(composed)}
       actions={
         <ActionPanel>

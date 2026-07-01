@@ -11,8 +11,8 @@
   "commands": [
     {
       "name": "translate",
-      "title": "Translate",
-      "subtitle": "Russian ⇄ English Translator",
+      "title": "Translator",
+      "subtitle": "Russian ⇄ English",
       "description": "Translate the selected text (or clipboard) between Russian and English — direction detected automatically; single words get a details block",
       "mode": "view"
     }
