@@ -46,19 +46,19 @@ Studio)** and **Open Extension Preferences** actions.
 | Setting | Type | Default | Purpose |
 |---|---|---|---|
 | **Gemini API Key** | password | — | Free key — [aistudio.google.com](https://aistudio.google.com/app/apikey). |
-| **Gemini Model** | text | `gemini-2.5-flash` | Gemini model ID. |
+| **Gemini Model** | text | `gemini-3.1-flash-lite` | Gemini model ID. |
 
-### Free-tier Gemini models
+### Gemini models
 
 The **Gemini Model** preference is just a string ID, so you can switch models without touching
 code:
 
 | Model ID | Notes |
 |---|---|
-| `gemini-2.5-flash` | **Default.** Best quality on the free tier; fast enough for everyday use. |
-| `gemini-2.5-flash-lite` | **Fastest.** Smaller and quicker — great for quick translations. |
-| `gemini-2.0-flash` | Previous-generation flash. Still fast and free. |
-| `gemini-2.0-flash-lite` | The leanest 2.0 option. |
+| `gemini-3.1-flash-lite` | **Default.** Newest lite model — frontier-class quality at low cost, fast, with generous rate limits. |
+| `gemini-3.5-flash` | More capable; use for the strongest results at slightly higher latency/cost. |
+| `gemini-2.5-flash` | Previous-generation flash; solid, but has a low free-tier daily request cap. |
+| `gemini-2.5-flash-lite` | Previous-generation lite variant — fast and cheap. |
 
 The extension disables the model's internal "thinking" step (`thinkingBudget: 0`) since
 translation is a direct task — this roughly halves latency with no quality loss. Free-tier
