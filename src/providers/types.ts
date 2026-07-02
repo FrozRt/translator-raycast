@@ -16,6 +16,6 @@ export interface TranslateOptions {
 export interface TranslateResult {
   /** The translation (protected tokens kept verbatim). */
   translation: string;
-  /** Ready-to-render markdown block, or null when the §3 rules say it isn't needed. */
-  explanation: string | null;
+  /** English synonyms for a single word, or null for a sentence / longer text. */
+  synonyms: string[] | null;
 }

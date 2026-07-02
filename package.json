@@ -13,8 +13,8 @@
       "name": "translate",
       "title": "Translator",
       "subtitle": "Russian ⇄ English",
-      "description": "Translate the selected text (or clipboard) between Russian and English — direction detected automatically; single words get a details block",
-      "mode": "view"
+      "description": "Translate the selected text (or clipboard) between Russian and English — direction detected automatically; the result is copied and shown in a HUD, with English synonyms for single words",
+      "mode": "no-view"
     }
   ],
   "preferences": [

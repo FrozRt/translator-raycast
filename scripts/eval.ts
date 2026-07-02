@@ -81,41 +81,41 @@ const CASES: EvalCase[] = [
     n: 1,
     title: "EN word «set» — single word gets details",
     input: "set",
-    expect: "RU translation + a details block (in Russian) covering several meanings.",
+    expect: "RU translation + a few ENGLISH synonyms (single word).",
     check: (r) => ({
-      ok: r.explanation !== null,
-      note: r.explanation !== null ? "details block present" : "no block (a single word should get one)",
+      ok: r.synonyms !== null && r.synonyms.length > 0,
+      note: r.synonyms ? `synonyms: ${r.synonyms.join(", ")}` : "no synonyms (a single word should get some)",
     }),
   },
   {
     n: 2,
-    title: "RU word «замок» — homonyms",
+    title: "RU word «замок» — synonyms in English",
     input: "замок",
-    expect: "EN translation + details block separating castle / lock.",
+    expect: "EN translation + a few English synonyms (of the English translation).",
     check: (r) => ({
-      ok: r.explanation !== null,
-      note: r.explanation !== null ? "details block present" : "no block (a single word should get one)",
+      ok: r.synonyms !== null && r.synonyms.length > 0,
+      note: r.synonyms ? `synonyms: ${r.synonyms.join(", ")}` : "no synonyms (a single word should get some)",
     }),
   },
   {
     n: 3,
-    title: "EN sentence — translation only, no block",
+    title: "EN sentence — translation only, no synonyms",
     input: "I will call you tomorrow",
-    expect: "RU translation, NO details block (explanation === null).",
+    expect: "RU translation, NO synonyms (synonyms === null).",
     check: (r) => ({
-      ok: r.explanation === null,
-      note: r.explanation === null ? "block absent (correct for a sentence)" : "block present but should not be",
+      ok: r.synonyms === null,
+      note: r.synonyms === null ? "synonyms absent (correct for a sentence)" : "synonyms present but should not be",
     }),
   },
   {
     n: 4,
     title: "RU sentence — direction flips to EN",
     input: "Я позвоню тебе завтра",
-    expect: "English translation; no details block.",
+    expect: "English translation; no synonyms.",
     check: (r) => {
       const looksEnglish = /[a-z]/i.test(r.translation) && !/[а-яё]/i.test(r.translation);
-      const noBlock = r.explanation === null;
-      return { ok: looksEnglish && noBlock, note: `english:${looksEnglish ? "✓" : "✗"} noBlock:${noBlock ? "✓" : "✗"}` };
+      const noSyn = r.synonyms === null;
+      return { ok: looksEnglish && noSyn, note: `english:${looksEnglish ? "✓" : "✗"} noSyn:${noSyn ? "✓" : "✗"}` };
     },
   },
   {
@@ -145,10 +145,10 @@ const CASES: EvalCase[] = [
     title: "Long RU paragraph — translation only",
     input:
       "Вчера я весь день работал из дома. Утром ответил на письма, потом созвонился с командой и обсудил план на неделю.",
-    expect: "EN translation; no details block.",
+    expect: "EN translation; no synonyms.",
     check: (r) => ({
-      ok: r.explanation === null,
-      note: r.explanation === null ? "block absent (correct for a paragraph)" : "block present but should not be",
+      ok: r.synonyms === null,
+      note: r.synonyms === null ? "synonyms absent (correct for a paragraph)" : "synonyms present but should not be",
     }),
   },
 ];
@@ -156,16 +156,10 @@ const CASES: EvalCase[] = [
 // --- printing ----------------------------------------------------------------
 function printResult(r: TranslateResult) {
   console.log(bold("Translation: ") + r.translation);
-  if (r.explanation) {
-    console.log(bold("Details:"));
-    console.log(
-      r.explanation
-        .split("\n")
-        .map((l) => "  " + l)
-        .join("\n"),
-    );
+  if (r.synonyms && r.synonyms.length > 0) {
+    console.log(bold("Synonyms:    ") + r.synonyms.join(", "));
   } else {
-    console.log(bold("Details: ") + dim("[no block]"));
+    console.log(bold("Synonyms:    ") + dim("[none]"));
   }
 }
 

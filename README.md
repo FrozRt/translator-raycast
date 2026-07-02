@@ -4,9 +4,10 @@ Translate between **Russian and English** without leaving your keyboard. The dir
 **detected automatically** — Cyrillic in → English out, Latin in → Russian out. There's no
 target language to pick.
 
-Select text in any app, press the hotkey, and a small window shows the translation. For a
-**single word** you also get a compact details block (in Russian) — meanings, part of speech,
-pronunciation, examples. For a **sentence or longer text**, just the translation, no noise.
+Select text in any app and press the hotkey: the translation is flashed in a **HUD** — no
+window, nothing to dismiss. For a **single word** the result also carries a few **English
+synonyms in brackets**, e.g. `берег (bank, shore, riverside)`. For a **sentence or longer text**,
+just the translation.
 
 Runs on **Google Gemini** (free tier — the key is free, see below).
 
@@ -14,13 +15,15 @@ Runs on **Google Gemini** (free tier — the key is free, see below).
 
 - **Auto-direction.** The model picks the direction from the dominant script of the input
   (Cyrillic → English, Latin → Russian). Works for a word, a phrase, or a paragraph.
-- **Selection-first input.** Reads the highlighted text in the frontmost app; if nothing is
-  selected, it falls back to the clipboard.
-- **Single-word details.** A word gets a dictionary-style block: meanings, forms, pronunciation,
-  examples, near synonyms. Sentences and longer text get the translation only.
+- **Selection-first, windowless.** Reads the highlighted text in the frontmost app; only if
+  nothing is selected does it fall back to the clipboard. The result appears in a HUD.
+- **Clipboard rule.** When the input came from a **selection**, the clipboard is left untouched.
+  When it came from the **clipboard** (nothing selected), the clipboard is overwritten with the
+  translation — so you can paste it straight away.
+- **English synonyms for single words.** A single word gets a few English synonyms in brackets;
+  sentences and longer text get the translation only.
 - **Term protection.** Proper nouns, brands, code, identifiers, URLs, and CLI commands (`push`,
   `merge`, `main`, `CI`, …) are **kept verbatim**.
-- **Copy from the result window.** Copy the translation, or the translation plus the details.
 
 ## Requirements
 
@@ -109,14 +112,15 @@ terms kept / auth error); the rest are printed for eyeballing. Env key: `GEMINI_
 
 ```
 src/
-  translate.tsx        # the only file that imports @raycast/api: reads selection/clipboard → Detail
-  prompt.ts            # system prompt: RU⇄EN auto-flip, term protection, single-word details
+  translate.tsx        # no-view command entry — calls the runner
+  run-translate.ts     # the Raycast glue: read selection/clipboard → translate → HUD (+ clipboard)
+  prompt.ts            # system prompt: RU⇄EN auto-flip, term protection, single-word synonyms
   providers/
     index.ts           # translate() entry point + default model
     types.ts           # TranslateOptions / TranslateResult
     gemini.ts          # Gemini generateContent (JSON response, key in header)
   lib/
-    input.ts           # read selected text, falling back to the clipboard
+    input.ts           # read selected text (or clipboard); reports which source was used
     http.ts            # postJson: timeout (AbortController) + status mapping
     parse.ts           # defensive JSON parsing with a fallback
     errors.ts          # TranslateError discriminated by kind
@@ -126,15 +130,15 @@ scripts/
 
 The **core (`prompt`/`providers`/`lib`) does not depend on `@raycast/api`** — the provider
 receives `apiKey`/`model` as explicit arguments (DI), so the same `translate()` runs in both the
-UI and the eval harness. The translation and the single-word details come back in **one request**
-as `{ translation, explanation | null }`; parsing is resilient to model misbehavior (strips
-``` fences, extracts the first JSON object, falls back to raw text).
+command and the eval harness. The translation and the single-word synonyms come back in **one
+request** as `{ translation, synonyms: string[] | null }`; parsing is resilient to model
+misbehavior (strips ``` fences, extracts the first JSON object, falls back to raw text).
 
 ## Credits
 
 This extension is derived from the **Polyglot** RU⇄EN translator by Makar Mishchenko, used under
-its MIT license, with a reworked UI (selection/clipboard input, result window) and behavior
-(single-word details only, in Russian).
+its MIT license, with a reworked, windowless UI (selection/clipboard input, HUD output) and
+behavior (English synonyms for single words instead of a full dictionary block).
 
 ## License
 

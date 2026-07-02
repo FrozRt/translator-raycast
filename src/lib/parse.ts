@@ -1,12 +1,12 @@
 /**
  * Defensive parsing of the model's JSON output with a fallback.
  *
- * The model is asked to return strictly {"translation": string, "explanation": string|null}
+ * The model is asked to return strictly {"translation": string, "synonyms": string[]|null}
  * with no preamble and no ``` fences. Models misbehave, so we:
  *   1) strip code fences;
  *   2) try JSON.parse;
  *   3) try to extract the first brace-balanced {...};
- *   4) fall back to: whole text = translation, explanation = null (spec §3).
+ *   4) fall back to: whole text = translation, synonyms = null.
  */
 
 import type { TranslateResult } from "../providers/types";
@@ -62,11 +62,14 @@ function coerce(parsed: unknown): TranslateResult | null {
   if (typeof obj.translation !== "string" || obj.translation.trim() === "") {
     return null;
   }
-  const explanation =
-    typeof obj.explanation === "string" && obj.explanation.trim() !== ""
-      ? obj.explanation.trim()
+  const synonyms =
+    Array.isArray(obj.synonyms) &&
+    obj.synonyms.some((s) => typeof s === "string" && s.trim() !== "")
+      ? obj.synonyms
+          .filter((s): s is string => typeof s === "string" && s.trim() !== "")
+          .map((s) => s.trim())
       : null;
-  return { translation: obj.translation.trim(), explanation };
+  return { translation: obj.translation.trim(), synonyms };
 }
 
 function tryParse(candidate: string): TranslateResult | null {
@@ -95,5 +98,5 @@ export function parseModelOutput(raw: string): TranslateResult {
   }
 
   // Fallback: the model ignored the format — show the fence-stripped text as-is.
-  return { translation: cleaned || text, explanation: null };
+  return { translation: cleaned || text, synonyms: null };
 }
